@@ -1,6 +1,60 @@
 const Task = require("../models/Task");
 const Team = require("../models/Team");
 //Create a Task
+// const createTask = async (req, res) => {
+//   try {
+//     const {
+//       title,
+//       description,
+//       priority,
+//       dueDate,
+//       assignedTo,
+//       attachments,
+//       todoCheckList,
+//       team,
+//       teamName,
+//     } = req.body;
+
+//     if (!Array.isArray(assignedTo)) {
+//       return res
+//         .status(400)
+//         .json({ message: "AssignedTo must be an array of user's Id." });
+//     }
+//     if (assignedTo.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "At least one user must be assigned to the task." });
+//     }
+
+//     if (!team) {
+//       return res.status(400).json({ message: "Team ID is required." });
+//     }
+
+//     const teamDoc = await Team.findById(team);
+//     if (!teamDoc) {
+//       return res.status(404).json({ message: "Team not found." });
+//     }
+//     const task = await Task.create({
+//       title,
+//       description,
+//       priority,
+//       dueDate,
+//       assignedTo,
+//       createdBy: req.user._id,
+//       todoCheckList,
+//       attachments,
+//       team,
+//     });
+
+//     res.status(201).json({ message: "Task created successfully", task: task });
+//   } catch (error) {
+//     console.log(error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch Tasks.", error: error.message });
+//   }
+// };
+
 const createTask = async (req, res) => {
   try {
     const {
@@ -11,7 +65,8 @@ const createTask = async (req, res) => {
       assignedTo,
       attachments,
       todoCheckList,
-      team
+      team,
+      teamName,
     } = req.body;
 
     if (!Array.isArray(assignedTo)) {
@@ -19,15 +74,83 @@ const createTask = async (req, res) => {
         .status(400)
         .json({ message: "AssignedTo must be an array of user's Id." });
     }
-
-       if (!team) {
-      return res.status(400).json({ message: "Team ID is required." });
+    if (assignedTo.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one user must be assigned to the task." });
     }
 
-       const teamDoc = await Team.findById(team);
-    if (!teamDoc) {
-      return res.status(404).json({ message: "Team not found." });
+    let teamDoc;
+    let finalTeamId;
+
+    // Case 1: If team ID is provided, use existing team
+    if (team && mongoose.Types.ObjectId.isValid(team)) {
+      teamDoc = await Team.findById(team);
+      if (!teamDoc) {
+        return res.status(404).json({ message: "Team not found." });
+      }
+      finalTeamId = team;
+
+      // Update existing team with new members (if they're not already in the team)
+      const newMembers = assignedTo.filter(
+        (userId) =>
+          !teamDoc.members.some(
+            (memberId) => memberId.toString() === userId.toString()
+          )
+      );
+
+      if (newMembers.length > 0) {
+        teamDoc.members = [...teamDoc.members, ...newMembers];
+        teamDoc.updatedAt = new Date();
+        await teamDoc.save();
+        console.log(
+          `Updated team "${teamDoc.teamName}" with ${newMembers.length} new members`
+        );
+      }
     }
+    // Case 2: If teamName is provided, create new team or update existing one
+    else if (teamName && teamName.trim()) {
+      const trimmedTeamName = teamName.trim();
+
+      teamDoc = await Team.findOne({ teamName: trimmedTeamName });
+
+      if (teamDoc) {
+        finalTeamId = teamDoc._id;
+
+        const newMembers = assignedTo.filter(
+          (userId) =>
+            !teamDoc.members.some(
+              (memberId) => memberId.toString() === userId.toString()
+            )
+        );
+
+        if (newMembers.length > 0) {
+          teamDoc.members = [...teamDoc.members, ...newMembers];
+          teamDoc.updatedAt = new Date();
+          await teamDoc.save();
+          console.log(
+            `Updated existing team "${trimmedTeamName}" with ${newMembers.length} new members`
+          );
+        }
+      } else {
+        // Create new team
+        teamDoc = await Team.create({
+          teamName: trimmedTeamName,
+          description: `Team created for task: ${title}`,
+          members: assignedTo,
+        });
+        finalTeamId = teamDoc._id;
+        console.log(
+          `Created new team "${trimmedTeamName}" with ${assignedTo.length} members`
+        );
+      }
+    } else {
+      return res.status(400).json({
+        message: "Either team ID or teamName is required.",
+      });
+    }
+
+    // Create the task
     const task = await Task.create({
       title,
       description,
@@ -37,22 +160,25 @@ const createTask = async (req, res) => {
       createdBy: req.user._id,
       todoCheckList,
       attachments,
-      team
+      team: finalTeamId,
     });
 
-    // res.status(201).json({
-    //   message: "Task created successfully",
-    //   task: {
-    //     ...task.toObject(),
-    //     teamName: teamDoc.name,
-    //   },
-    // });
-    res.status(201).json({ message: "Task created successfully", task: task });
+    // Populate the task with team and assignedTo details for response
+    const populatedTask = await Task.findById(task._id)
+      .populate("assignedTo", "name email profileImageUrl")
+      .populate("team", "teamName description members");
+
+    res.status(201).json({
+      message: "Task created successfully",
+      task: populatedTask,
+      teamAction:
+        teamDoc.createdAt === teamDoc.updatedAt ? "created" : "updated",
+    });
   } catch (error) {
     console.log(error);
     res
       .status(500)
-      .json({ message: "Failed to fetch Tasks.", error: error.message });
+      .json({ message: "Failed to create task.", error: error.message });
   }
 };
 
@@ -72,10 +198,10 @@ const getTasks = async (req, res) => {
         "name email profileImageUrl"
       );
     } else {
-      tasks = await Task.find({ ...filter, assignedTo: { $in: [req.user._id]} }).populate(
-        "assignedTo",
-        "name email profileImageUrl "
-      );
+      tasks = await Task.find({
+        ...filter,
+        assignedTo: { $in: [req.user._id] },
+      }).populate("assignedTo", "name email profileImageUrl ");
     }
 
     tasks = await Promise.all(
@@ -364,7 +490,7 @@ const getDashboardData = async (req, res) => {
 const getUserDashboardData = async (req, res) => {
   try {
     const userId = req.user._id;
-    
+
     const totalTasks = await Task.countDocuments({ assignedTo: userId });
     const pendingTasks = await Task.countDocuments({
       assignedTo: userId,
