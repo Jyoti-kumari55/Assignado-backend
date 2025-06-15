@@ -46,7 +46,11 @@ const getUsers = async (req, res) => {
 //Get user by id
 const getUserById = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const userId = req.params.id;
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required." });
+    }
+    const user = await User.findById(userId).select("-password");
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
@@ -56,46 +60,6 @@ const getUserById = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch user by Id.", error: error.message });
-  }
-};
-
-// Change user password
-const changeUserPassword = async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "Current and new password are required." });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res
-        .status(401)
-        .json({ message: "Current password is incorrect." });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    user.password = hashedPassword;
-    await user.save();
-
-    res.status(200).json({ message: "Password updated successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Failed to change password.",
-      error: error.message,
-    });
   }
 };
 
@@ -114,11 +78,13 @@ const updateUser = async (req, res) => {
     const userId = req.params.id;
 
     if (req.user._id.toString() !== userId.toString()) {
-      return res.status(403).json({ message: "Unauthorized to update this user." });
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to update this user." });
     }
 
     const user = await User.findById(userId);
-    
+
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
@@ -161,6 +127,73 @@ const updateUser = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to update user.", error: error.message });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const requestingUserId = req.user.id;
+    const requestingUserRole = req.user.role;
+
+    // Allow if admin or user deleting their own account
+    if (requestingUserRole !== "admin" && requestingUserId !== targetUserId) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete this user." });
+    }
+
+    const user = await User.findByIdAndDelete(targetUserId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json({ message: "User deleted successfully." });
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ message: "Failed to delete user.", error: error.message });
+  }
+};
+
+// Change user password
+const changeUserPassword = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Current and new password are required." });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ message: "Current password is incorrect." });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to change password.",
+      error: error.message,
+    });
   }
 };
 
@@ -231,7 +264,6 @@ const updateUser = async (req, res) => {
 //   }
 // };
 
-
 //Delete user
 // const deleteUser = async (req, res) => {
 //   try {
@@ -248,29 +280,5 @@ const updateUser = async (req, res) => {
 // };
 
 // Delete user with role-based access control
-const deleteUser = async (req, res) => {
-  try {
-    const targetUserId = req.params.id;
-    const requestingUserId = req.user.id;
-    const requestingUserRole = req.user.role;
-
-    // Allow if admin or user deleting their own account
-    if (requestingUserRole !== "admin" && requestingUserId !== targetUserId) {
-      return res.status(403).json({ message: "Not authorized to delete this user." });
-    }
-
-    const user = await User.findByIdAndDelete(targetUserId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    res.status(200).json({ message: "User deleted successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to delete user.", error: error.message });
-  }
-};
-
-
 
 module.exports = { getUsers, getUserById, updateUser, deleteUser };
