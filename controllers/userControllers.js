@@ -2,6 +2,102 @@ const User = require("../models/User");
 const Task = require("../models/Task");
 const bcrypt = require("bcryptjs");
 
+// Add this function to your user controller file
+
+const createUser = async (req, res) => {
+  try {
+    const {
+      name,
+      username,
+      email,
+      password,
+      role = "member",
+      bio,
+      profileImageUrl,
+    } = req.body;
+
+    // Check if the requesting user is an admin
+    if (req.user.role !== "admin") {
+      return res.status(403).json({
+        message: "Access denied. Only admins can create users.",
+      });
+    }
+
+    // Validate required fields
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({
+        message: "Name, username, email, and password are required.",
+      });
+    }
+
+    // Check if user already exists (email or username)
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
+
+    if (existingUser) {
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: "Email already exists." });
+      }
+      if (existingUser.username === username) {
+        return res.status(400).json({ message: "Username already exists." });
+      }
+    }
+
+    // Validate role
+    const validRoles = ["admin", "member"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        message: "Invalid role. Must be 'admin' or 'member'.",
+      });
+    }
+
+    // Hash the password
+    const salt = await bcrypt.genSalt(16);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new user
+    const newUser = new User({
+      name,
+      username,
+      email,
+      password: hashedPassword,
+      role,
+      bio: bio || "",
+      profileImageUrl: profileImageUrl || "/default-avatar.png",
+    });
+
+    const savedUser = await newUser.save();
+
+    // Remove password from response
+    const userResponse = savedUser.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      message: "User created successfully.",
+      user: userResponse,
+    });
+  } catch (error) {
+    console.error("Error creating user:", error);
+
+    // Handle validation errors
+    if (error.name === "ValidationError") {
+      const validationErrors = Object.values(error.errors).map(
+        (err) => err.message
+      );
+      return res.status(400).json({
+        message: "Validation error.",
+        errors: validationErrors,
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to create user.",
+      error: error.message,
+    });
+  }
+};
+
 // Get all users
 const getUsers = async (req, res) => {
   try {
@@ -133,7 +229,7 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const targetUserId = req.params.id;
-    const requestingUserId = req.user.id;
+    const requestingUserId = req.user._id.toString();
     const requestingUserRole = req.user.role;
 
     // Allow if admin or user deleting their own account
@@ -143,12 +239,28 @@ const deleteUser = async (req, res) => {
         .json({ message: "Not authorized to delete this user." });
     }
 
-    const user = await User.findByIdAndDelete(targetUserId);
-    if (!user) {
+    // Check if the user exists before attempting to delete
+    const userToDelete = await User.findById(targetUserId);
+    if (!userToDelete) {
       return res.status(404).json({ message: "User not found." });
     }
+    // Prevent admin from deleting themselves (optional safety check)
+    if (requestingUserRole === "admin" && requestingUserId === targetUserId) {
+      return res.status(400).json({
+        message:
+          "Admins cannot delete their own account. Please contact another admin.",
+      });
+    }
 
-    res.status(200).json({ message: "User deleted successfully." });
+    // Delete the user
+    await User.findByIdAndDelete(targetUserId);
+
+    // Optional: Also delete all tasks assigned to this user
+    // await Task.deleteMany({ assignedTo: targetUserId });
+
+    res.status(200).json({
+      message: "User and associated data deleted successfully.",
+    });
   } catch (error) {
     console.error(error);
     res
@@ -281,4 +393,4 @@ const changeUserPassword = async (req, res) => {
 
 // Delete user with role-based access control
 
-module.exports = { getUsers, getUserById, updateUser, deleteUser };
+module.exports = { createUser, getUsers, getUserById, updateUser, deleteUser };

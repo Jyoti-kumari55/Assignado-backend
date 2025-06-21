@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Task = require("../models/Task");
 const Team = require("../models/Team");
 //Create a Task
@@ -150,7 +151,6 @@ const createTask = async (req, res) => {
       });
     }
 
-    // Create the task
     const task = await Task.create({
       title,
       description,

@@ -48,16 +48,18 @@ const registerUser = async (req, res) => {
     });
     const savedUser = await user.save();
 
-    const accessToken = jwt.sign({ user }, process.env.JWT_TASK_SECRET_TOKEN, {
-      expiresIn: "1d",
+    const accessToken = jwt.sign(
+      { userId: savedUser._id, email: savedUser.email, role: savedUser.role },
+      process.env.JWT_TASK_SECRET_TOKEN,
+      {
+        expiresIn: "1d",
+      }
+    );
+    res.status(201).json({
+      message: "User registered successfully.",
+      user: savedUser,
+      token: accessToken,
     });
-    res
-      .status(201)
-      .json({
-        message: "User registered successfully.",
-        user: savedUser,
-        token: accessToken,
-      });
   } catch (error) {
     console.log(error);
     res
@@ -71,7 +73,7 @@ const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-    if(!user) {
+    if (!user) {
       return res.status(400).json({ message: "User not found." });
     }
 
@@ -83,7 +85,7 @@ const loginUser = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user._id, email: user.email, role: user.role, _id: user._id },
       process.env.JWT_TASK_SECRET_TOKEN,
       {
         expiresIn: "8h",
@@ -106,7 +108,6 @@ const loginUser = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to logged in a User.", error: error.message });
-  
   }
 };
 
@@ -130,10 +131,12 @@ const getUserProfile = async (req, res) => {
   try {
     const user = await User.findOne(req.user._id).select("-password -email");
     // console.log("00000", user);
-    if(!user) {
-        return res.status(401).json({ message: "User not found." });
+    if (!user) {
+      return res.status(401).json({
+        message: "User not found.This account may have been deleted.",
+      });
     }
-    return res.status(200).json({ message: "User Details", user: user})
+    return res.status(200).json({ message: "User Details", user: user });
   } catch (error) {
     console.log(error);
     res
@@ -141,6 +144,5 @@ const getUserProfile = async (req, res) => {
       .json({ message: "Failed to logged in a User.", error: error.message });
   }
 };
-
 
 module.exports = { registerUser, loginUser, logoutUser, getUserProfile };
