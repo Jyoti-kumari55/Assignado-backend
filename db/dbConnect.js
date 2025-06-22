@@ -5,9 +5,9 @@ const mongoURI = process.env.MONGODB;
 const connectionOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 30000,
   socketTimeoutMS: 45000,
-  connectTimeoutMS: 10000,
+  connectTimeoutMS: 30000,
 };
 mongoose
   .connect(mongoURI, connectionOptions)
