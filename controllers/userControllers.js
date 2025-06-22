@@ -1,9 +1,7 @@
 const User = require("../models/User");
 const Task = require("../models/Task");
 const bcrypt = require("bcryptjs");
-
-// Add this function to your user controller file
-
+//Create user
 const createUser = async (req, res) => {
   try {
     const {
@@ -24,9 +22,9 @@ const createUser = async (req, res) => {
     }
 
     // Validate required fields
-    if (!name || !username || !email || !password) {
+    if (!name || !email || !password) {
       return res.status(400).json({
-        message: "Name, username, email, and password are required.",
+        message: "Name, email, and password are required.",
       });
     }
 
@@ -39,9 +37,9 @@ const createUser = async (req, res) => {
       if (existingUser.email === email) {
         return res.status(400).json({ message: "Email already exists." });
       }
-      if (existingUser.username === username) {
-        return res.status(400).json({ message: "Username already exists." });
-      }
+      // if (existingUser.username === username) {
+      //   return res.status(400).json({ message: "Username already exists." });
+      // }
     }
 
     // Validate role
