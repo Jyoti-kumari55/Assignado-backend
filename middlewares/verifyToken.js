@@ -17,7 +17,9 @@ const protect = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_TASK_SECRET_TOKEN);
     // req.user = await User.findById(decoded.id).select("-password");
-    const user = await User.findById(decoded.userId || decoded).select("-password");
+    const user = await User.findById(decoded.userId || decoded).select(
+      "-password"
+    );
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -37,13 +39,12 @@ const protect = async (req, res, next) => {
 const adminOnly = (req, res, next) => {
   // console.log("Inside adminOnly middleware", req.user);
   if (req.user?.role !== "admin") {
-      //  console.error("Admin-only access denied for user:", req.user);
-    res.status(403).json({
+    //  console.error("Admin-only access denied for user:", req.user);
+    return res.status(403).json({
       message: "Access denied. Only Admin Allowed.",
     });
   }
   next();
-
 };
 
 module.exports = { protect, adminOnly };
