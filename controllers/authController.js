@@ -129,7 +129,7 @@ const logoutUser = async (req, res) => {
 
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findOne(req.user._id).select("-password -email");
+    const user = await User.findById(req.user._id).select("-password -email");
     // console.log("00000", user);
     if (!user) {
       return res.status(401).json({
