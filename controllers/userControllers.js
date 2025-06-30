@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Task = require("../models/Task");
 const bcrypt = require("bcryptjs");
+
 //Create user
 const createUser = async (req, res) => {
   try {

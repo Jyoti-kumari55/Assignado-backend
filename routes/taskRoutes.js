@@ -13,7 +13,7 @@ const { protect, adminOnly } = require("../middlewares/verifyToken");
 
 const router = require("express").Router();
 
-router.get("/dashboard", protect, adminOnly, getDashboardData);
+router.get("/dashboard", protect, getDashboardData);
 router.get("/user-dashboard", protect, getUserDashboardData);
 router.get("/tasks", protect, getTasks);
 router.get("/tasks/:id", protect, getTaskById);
