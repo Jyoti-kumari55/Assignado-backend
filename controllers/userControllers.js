@@ -2,6 +2,11 @@ const User = require("../models/User");
 const Task = require("../models/Task");
 const bcrypt = require("bcryptjs");
 
+const hashPassword = async (password) => {
+  const salt = await bcrypt.genSalt(16);
+  return bcrypt.hash(password, salt);
+};
+
 //Create user
 const createUser = async (req, res) => {
   try {
@@ -18,7 +23,7 @@ const createUser = async (req, res) => {
     // Check if the requesting user is an admin
     if (req.user.role !== "admin") {
       return res.status(403).json({
-        message: "Access denied. Only admins can create users.",
+        message: "Access denied required.",
       });
     }
 
@@ -35,25 +40,25 @@ const createUser = async (req, res) => {
     });
 
     if (existingUser) {
-      if (existingUser.email === email) {
-        return res.status(400).json({ message: "Email already exists." });
-      }
-      // if (existingUser.username === username) {
-      //   return res.status(400).json({ message: "Username already exists." });
-      // }
+      return res
+        .status(400)
+        .json({ message: "Email or Username already exists." });
     }
+    // if (existingUser.username === username) {
+    //   return res.status(400).json({ message: "Username already exists." });
+    // }
 
     // Validate role
     const validRoles = ["admin", "member"];
     if (!validRoles.includes(role)) {
       return res.status(400).json({
-        message: "Invalid role. Must be 'admin' or 'member'.",
+        message: "Invalid role.",
       });
     }
 
     // Hash the password
-    const salt = await bcrypt.genSalt(16);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // const salt = await bcrypt.genSalt(16);
+    const hashedPassword = await hashPassword(password);
 
     // Create new user
     const newUser = new User({
@@ -66,15 +71,17 @@ const createUser = async (req, res) => {
       profileImageUrl: profileImageUrl || "/default-avatar.png",
     });
 
-    const savedUser = await newUser.save();
+    // const savedUser = await newUser.save();
 
-    // Remove password from response
-    const userResponse = savedUser.toObject();
-    delete userResponse.password;
+    // // Remove password from response
+    // const userResponse = savedUser.toObject();
+    // delete userResponse.password;
+
+    const { password: _, ...userResponse } = newUser.toObject();
 
     res.status(201).json({
       message: "User created successfully.",
-      user: userResponse,
+      user: newUser,
     });
   } catch (error) {
     console.error("Error creating user:", error);
@@ -149,7 +156,7 @@ const getUserById = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
-    return res.status(200).json({ message: "User Found", user: user });
+    res.status(200).json({ message: "User Found", user: user });
   } catch (error) {
     console.log(error);
     res
@@ -184,10 +191,12 @@ const updateUser = async (req, res) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    user.name = name || user.name;
-    user.username = username || user.username;
-    user.bio = bio || user.bio;
-    user.profileImageUrl = profileImageUrl || user.profileImageUrl;
+    // Update fields
+    Object.assign(user, { name, username, bio, profileImageUrl });
+    // user.name = name || user.name;
+    // user.username = username || user.username;
+    // user.bio = bio || user.bio;
+    // user.profileImageUrl = profileImageUrl || user.profileImageUrl;
 
     // Check if email is being updated and if it's already taken
     if (email && email !== user.email) {
@@ -208,11 +217,12 @@ const updateUser = async (req, res) => {
           .status(401)
           .json({ message: "Current password is incorrect." });
       }
-      const salt = await bcrypt.genSalt(16);
-      user.password = await bcrypt.hash(newPassword, salt);
+      // const salt = await bcrypt.genSalt(16);
+      // user.password = await bcrypt.hash(newPassword, salt);
+      user.password = await hashPassword(newPassword);
     }
     const updatedUser = await user.save();
-    console.log(updateUser);
+    // console.log(updateUser);
 
     res
       .status(200)
@@ -246,8 +256,7 @@ const deleteUser = async (req, res) => {
     // Prevent admin from deleting themselves (optional safety check)
     if (requestingUserRole === "admin" && requestingUserId === targetUserId) {
       return res.status(400).json({
-        message:
-          "Admins cannot delete their own account. Please contact another admin.",
+        message: "Admins cannot delete their own account.",
       });
     }
 
@@ -258,7 +267,7 @@ const deleteUser = async (req, res) => {
     // await Task.deleteMany({ assignedTo: targetUserId });
 
     res.status(200).json({
-      message: "User and associated data deleted successfully.",
+      message: "User deleted successfully.",
     });
   } catch (error) {
     console.error(error);
@@ -267,129 +276,5 @@ const deleteUser = async (req, res) => {
       .json({ message: "Failed to delete user.", error: error.message });
   }
 };
-
-// Change user password
-const changeUserPassword = async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res
-        .status(400)
-        .json({ message: "Current and new password are required." });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) {
-      return res
-        .status(401)
-        .json({ message: "Current password is incorrect." });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    user.password = hashedPassword;
-    await user.save();
-
-    res.status(200).json({ message: "Password updated successfully." });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: "Failed to change password.",
-      error: error.message,
-    });
-  }
-};
-
-// const updateUser = async (req, res) => {
-//   try {
-//     const {
-//       name,
-//       username,
-//       bio,
-//       profileImageUrl,
-//       email,
-//       currentPassword,
-//       newPassword,
-//     } = req.body;
-
-//     // const profileImageUrl = req.file ? `/uploads/${req.file.filename}` : null;
-//     // Determine which user's profile to update
-//     const targetUserId = req.params.id || req.user._id;
-
-//     // If not admin, ensure they can only update their own profile
-//     if (req.user.role !== "admin" && targetUserId.toString() !== req.user._id.toString()) {
-//       return res.status(403).json({ message: "Access denied. You can only update your own profile." });
-//     }
-
-//     const user = await User.findById(targetUserId);
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found." });
-//     }
-
-//     // Update fields if provided
-//     user.name = name || user.name;
-//     user.username = username || user.username;
-//     user.bio = bio || user.bio;
-//     user.profileImageUrl = profileImageUrl ||  user.profileImageUrl;
-//     user.email = email || user.email;
-
-//     // Update email with uniqueness check
-//     if (email && email !== user.email) {
-//       const emailExists = await User.findOne({ email });
-//       if (emailExists) {
-//         return res.status(400).json({ message: "Email already in use." });
-//       }
-//       user.email = email;
-//     }
-
-//     // Password change (requires current password)
-//     if (currentPassword && newPassword) {
-//       const isPasswordMatch = await bcrypt.compare(currentPassword, user.password);
-//       if (!isPasswordMatch) {
-//         return res.status(401).json({ message: "Current password is incorrect." });
-//       }
-//       const salt = await bcrypt.genSalt(16);
-//       user.password = await bcrypt.hash(newPassword, salt);
-//     }
-
-//     const updatedUser = await user.save();
-
-//     res.status(200).json({
-//       message: "User profile updated successfully.",
-//       user: updatedUser,
-//     });
-//   } catch (error) {
-//     console.error("Error updating user:", error.message);
-//     res.status(500).json({
-//       message: "Failed to update user.",
-//       error: error.message,
-//     });
-//   }
-// };
-
-//Delete user
-// const deleteUser = async (req, res) => {
-//   try {
-//     const user = await User.findByIdAndDelete(req.params.id);
-//     if (!user) {
-//       return res.status(404).json({ message: "User not found." });
-//     }
-
-//     res.status(200).json({ message: "User deleted successfully." });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: "Failed to delete user.", error: error.message });
-//   }
-// };
-
-// Delete user with role-based access control
 
 module.exports = { createUser, getUsers, getUserById, updateUser, deleteUser };

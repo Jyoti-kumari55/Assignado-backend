@@ -15,11 +15,11 @@ const protect = async (req, res, next) => {
         .json({ message: "No token, authorization denied" });
     }
 
+    //Verify Token
     const decoded = jwt.verify(token, process.env.JWT_TASK_SECRET_TOKEN);
     // req.user = await User.findById(decoded.id).select("-password");
-    const user = await User.findById(decoded.userId || decoded).select(
-      "-password"
-    );
+    // const userId = decoded.userId || decoded.id;
+    const user = await User.findById(decoded.userId).select("-password").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }

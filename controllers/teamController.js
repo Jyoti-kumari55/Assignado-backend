@@ -1,36 +1,34 @@
-const express = require("express");
-const router = express.Router();
 const Team = require("../models/Team");
 const User = require("../models/User");
 
+const validateMembers = async (members) => {
+  if (!members?.length) return [];
+
+  const users = await User.find({ _id: { $in: members } });
+  if (users.length !== members.length) {
+    throw new Error("One or more selected users are invalid");
+  }
+  return members;
+};
 // Create a team
 const createTeam = async (req, res) => {
   try {
     const { teamName, description, members = [] } = req.body;
 
-    if (!teamName || !teamName.trim()) {
+    if (!teamName.trim()) {
       return res.status(400).json({ error: "Team name is required" });
     }
-
-    const existingTeam = await Team.findOne({ teamName: teamName.trim() });
+    const trimmedName = teamName.trim();
+    const existingTeam = await Team.findOne({ teamName: trimmedName });
     if (existingTeam) {
       return res.status(400).json({ error: "Team already exists" });
     }
 
-    let validateMembers = [];
-    if (members && members.length > 0) {
-      const users = await User.find({ _id: { $in: members } });
-      if (users.length !== members.length) {
-        return res
-          .status(400)
-          .json({ error: "One or more selected users are invalid" });
-      }
-      validateMembers = members;
-    }
+    const validatedMembers = await validateMembers(members);
     const newTeam = await Team.create({
-      teamName: teamName.trim(),
+      teamName: trimmedName,
       description: description?.trim() || "",
-      members: validateMembers,
+      members: validatedMembers,
     });
     const populatedTeam = await Team.findById(newTeam._id).populate(
       "members",
@@ -42,12 +40,12 @@ const createTeam = async (req, res) => {
     //  console.log(newTeam);
     res
       .status(201)
-      .json({ message: "Team created successfully", teamName: populatedTeam });
-  } catch (err) {
+      .json({ message: "Team created successfully", team: populatedTeam });
+  } catch (error) {
     console.error("error: ", err);
     res
       .status(500)
-      .json({ error: "Failed to create team", details: err.message });
+      .json({ error: "Failed to create team", details: error.message });
   }
 };
 
@@ -56,7 +54,10 @@ const updateTeam = async (req, res) => {
   try {
     const { teamName, description, members } = req.body;
     const teamId = req.params.id;
-    const updateData = {};
+
+    // Update updatedAt field
+    const updateData = { updatedAt: new Date() };
+
     if (teamName !== undefined) {
       if (!teamName.trim()) {
         return res.status(400).json({ error: "Team name cannot be empty" });
@@ -68,21 +69,11 @@ const updateTeam = async (req, res) => {
       updateData.description = description?.trim() || "";
     }
 
-    // Validate members if provided
     if (members !== undefined) {
-      if (members.length > 0) {
-        const users = await User.find({ _id: { $in: members } });
-        if (users.length !== members.length) {
-          return res
-            .status(400)
-            .json({ error: "One or more selected users are invalid" });
-        }
-      }
-      updateData.members = members;
+      updateData.members = await validateMembers(members);
     }
 
-    // Update updatedAt field
-    updateData.updatedAt = new Date();
+    // updateData.updatedAt = new Date();
 
     const updatedTeam = await Team.findByIdAndUpdate(teamId, updateData, {
       new: true,
@@ -97,25 +88,11 @@ const updateTeam = async (req, res) => {
       message: "Team updated successfully",
       team: updatedTeam,
     });
-    // const updatedTeam = await Team.findByIdAndUpdate(
-    //   req.params.id,
-    //   { teamName, description },
-    //   { new: true, runValidators: true }
-    // );
-
-    // if (!updatedTeam) {
-    //   return res.status(404).json({ error: "Team not found" });
-    // }
-
-    // res.json({ message: "Team updated successfully", team: updatedTeam });
-  } catch (err) {
-    if (err.code === 11000) {
-      res.status(400).json({ error: "Team name must be unique" });
-    } else {
-      res
-        .status(500)
-        .json({ error: "Failed to update team", details: err.message });
-    }
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .json({ error: "Failed to update team", details: error.message });
   }
 };
 
@@ -136,11 +113,11 @@ const deleteTeam = async (req, res) => {
       message: "Team deleted successfully",
       team: deletedTeam,
     });
-  } catch (err) {
-    console.error("Error: ", err);
+  } catch (error) {
+    console.error("Error: ", error);
     res
       .status(500)
-      .json({ error: "Failed to update team", message: err.message });
+      .json({ error: "Failed to update team", message: error.message });
   }
 };
 
@@ -148,16 +125,16 @@ const deleteTeam = async (req, res) => {
 const getAllTeams = async (req, res) => {
   try {
     const teams = await Team.find()
-      .populate("members", "name email username profileImageUrl") // Populate member details
+      .populate("members", "name email username profileImageUrl")
       .sort({ createdAt: -1 });
     res
       .status(200)
       .json({ message: "Teams fetched successfully", teams: teams });
-  } catch (err) {
-    console.error("Error fetching teams:", err);
+  } catch (error) {
+    console.error("Error fetching teams:", error);
     res
       .status(500)
-      .json({ error: "Failed to retrieve teams", details: err.message });
+      .json({ error: "Failed to retrieve teams", details: error.message });
   }
 };
 

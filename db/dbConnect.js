@@ -5,9 +5,13 @@ const mongoURI = process.env.MONGODB;
 const connectionOptions = {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 30000,
-  socketTimeoutMS: 45000,
-  connectTimeoutMS: 30000,
+  serverSelectionTimeoutMS: 10000,
+  socketTimeoutMS: 15000,
+  // connectTimeoutMS: 20000,
+  maxPoolSize: 10,
+  bufferCommands: true,
+  // bufferMaxEntries: 0,
+  retryWrites: true,
 };
 mongoose
   .connect(mongoURI, connectionOptions)
@@ -16,4 +20,8 @@ mongoose
   })
   .catch((error) => {
     console.error("Error connecting to MongoDB:", error);
+    setTimeout(() => {
+      console.log("Retrying MongoDB connection...");
+      mongoose.connect(mongoURI, connectionOptions);
+    }, 5000);
   });

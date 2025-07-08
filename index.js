@@ -1,18 +1,20 @@
-require("./db/dbConnect");
 require("dotenv").config();
+require("./db/dbConnect");
+
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
-const bcrypt = require("bcryptjs");
-const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const cookieParser = require("cookie-parser");
+const mongoose = require("mongoose");
+
+//Import Routes
 const authRoute = require("./routes/authRoutes");
 const adminRoute = require("./routes/adminRoutes");
 const userRoute = require("./routes/userRoutes");
 const taskRoute = require("./routes/taskRoutes");
 const teamRoute = require("./routes/teamRoutes");
 const reportRoute = require("./routes/reportRoutes");
+
 const { protect } = require("./middlewares/verifyToken");
 const upload = require("./middlewares/uploader");
 
@@ -22,6 +24,8 @@ const corsOptions = {
   origin: "http://localhost:5173",
   credentials: true,
   optionSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
 };
 
 app.use(cors(corsOptions));
@@ -43,7 +47,7 @@ app.get("/", (req, res) => {
   res.send("Hello, Task Manager!");
 });
 
-// All Routes
+//Routes
 app.use("/api/auth", authRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/user", userRoute);
