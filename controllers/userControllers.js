@@ -20,30 +20,45 @@ const createUser = async (req, res) => {
       profileImageUrl,
     } = req.body;
 
-    // Check if the requesting user is an admin
     if (req.user.role !== "admin") {
       return res.status(403).json({
         message: "Access denied required.",
       });
     }
 
-    // Validate required fields
     if (!name || !email || !password) {
       return res.status(400).json({
         message: "Name, email, and password are required.",
       });
     }
 
-    // Check if user already exists (email or username)
+    // const existingUser = await User.findOne({
+    //   $or: [{ email }, { username }],
+    // });
+
+    const existingConditions = [{ email }];
+    if (username) {
+      existingConditions.push({ username });
+    }
+
     const existingUser = await User.findOne({
-      $or: [{ email }, { username }],
+      $or: existingConditions,
     });
 
     if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "Email or Username already exists." });
+      if (existingUser.email === email) {
+        return res.status(400).json({ message: "Email already exists." });
+      }
+      if (username && existingUser.username === username) {
+        return res.status(400).json({ message: "Username already exists." });
+      }
     }
+
+    // if (existingUser) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Email or Username already exists." });
+    // }
     // if (existingUser.username === username) {
     //   return res.status(400).json({ message: "Username already exists." });
     // }
@@ -56,14 +71,12 @@ const createUser = async (req, res) => {
       });
     }
 
-    // Hash the password
-    // const salt = await bcrypt.genSalt(16);
     const hashedPassword = await hashPassword(password);
 
     // Create new user
     const newUser = new User({
       name,
-      username,
+      username: username || null,
       email,
       password: hashedPassword,
       role,
@@ -71,32 +84,21 @@ const createUser = async (req, res) => {
       profileImageUrl: profileImageUrl || "/default-avatar.png",
     });
 
-    // const savedUser = await newUser.save();
+    const savedUser = await newUser.save();
 
-    // // Remove password from response
-    // const userResponse = savedUser.toObject();
-    // delete userResponse.password;
+    // Remove password from response
+    const newUserData = savedUser.toObject();
+    delete userResponse.password;
 
-    const { password: _, ...userResponse } = newUser.toObject();
+    //remove password from user details
+    // const { password: _, ...userResponse } = newUser.toObject();
 
     res.status(201).json({
       message: "User created successfully.",
-      user: newUser,
+      user: newUserData,
     });
   } catch (error) {
     console.error("Error creating user:", error);
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      const validationErrors = Object.values(error.errors).map(
-        (err) => err.message
-      );
-      return res.status(400).json({
-        message: "Validation error.",
-        errors: validationErrors,
-      });
-    }
-
     res.status(500).json({
       message: "Failed to create user.",
       error: error.message,
