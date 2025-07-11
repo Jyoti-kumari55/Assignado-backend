@@ -88,7 +88,7 @@ const createUser = async (req, res) => {
 
     // Remove password from response
     const newUserData = savedUser.toObject();
-    delete userResponse.password;
+    delete newUserData.password;
 
     //remove password from user details
     // const { password: _, ...userResponse } = newUser.toObject();
