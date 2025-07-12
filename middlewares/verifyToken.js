@@ -5,7 +5,6 @@ const protect = async (req, res, next) => {
   try {
     let token = req.cookies.token;
 
-    // console.log("tototot: ", token);
     if (!token && req.headers.authorization?.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
     }
@@ -17,18 +16,14 @@ const protect = async (req, res, next) => {
 
     //Verify Token
     const decoded = jwt.verify(token, process.env.JWT_TASK_SECRET_TOKEN);
-    // req.user = await User.findById(decoded.id).select("-password");
-    // const userId = decoded.userId || decoded.id;
+
     const user = await User.findById(decoded.userId).select("-password").lean();
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    console.log("Authenticated user:", { id: user._id, role: user.role });
+    // console.log("Authenticated user:", { id: user._id, role: user.role });
     req.user = user;
     next();
-    // } else {
-    //   res.status(401).json({ message: "Not authorized, no token" });
-    // }
   } catch (error) {
     console.error("JWT verification error:", error.message);
     res
@@ -38,9 +33,7 @@ const protect = async (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-  // console.log("Inside adminOnly middleware", req.user);
   if (req.user?.role !== "admin") {
-    //  console.error("Admin-only access denied for user:", req.user);
     return res.status(403).json({
       message: "Access denied. Only Admin Allowed.",
     });

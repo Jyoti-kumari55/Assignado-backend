@@ -6,6 +6,7 @@ const cors = require("cors");
 const cloudinary = require("cloudinary").v2;
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
+const fs = require("fs");
 
 //Import Routes
 const authRoute = require("./routes/authRoutes");
@@ -55,9 +56,6 @@ app.use("/api/tasks", taskRoute);
 app.use("/api/reports", reportRoute);
 app.use("/api/teams", teamRoute);
 
-// Upload
-// app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
 app.post(
   "/api/upload-image",
   protect,
@@ -76,7 +74,7 @@ app.post(
         folder: "uploads",
       });
 
-      console.log("Rsss: ", result);
+      // console.log("Rsss: ", result);
 
       fs.unlink(file.path, (err) => {
         if (err) console.error("Error deleting file:", err);

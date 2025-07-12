@@ -1,5 +1,5 @@
 const User = require("../models/User");
-const Task = require("../models/Task");
+const bcrypt = require("bcryptjs");
 
 const updateAdminProfile = async (req, res) => {
   try {
@@ -13,7 +13,7 @@ const updateAdminProfile = async (req, res) => {
       newPassword,
     } = req.body;
 
-     const userId = req.params.id;
+    const userId = req.params.id;
 
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied. Admins only." });
@@ -37,7 +37,7 @@ const updateAdminProfile = async (req, res) => {
       }
       user.email = email;
     }
-// compare password
+    // compare password
     if (currentPassword && newPassword) {
       const isPasswordMatch = await bcrypt.compare(
         currentPassword,
