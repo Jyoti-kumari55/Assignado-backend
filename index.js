@@ -78,13 +78,24 @@ app.post(
 
       console.log("Rsss: ", result);
 
+      fs.unlink(file.path, (err) => {
+        if (err) console.error("Error deleting file:", err);
+      });
+
       res.status(200).json({
         message: "Image uploaded successfully!",
-        imageUrl: result.secure_url, // URL of the uploaded image
+        imageUrl: result.secure_url,
         imageId: result.public_id,
       });
     } catch (error) {
       console.error(error);
+      // Clean up file if upload failed
+      if (req.file && req.file.path) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Error deleting file:", err);
+        });
+      }
+
       res.status(500).json({ message: "Error uploading image.", error: error });
     }
   }
