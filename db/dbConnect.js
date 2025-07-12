@@ -3,8 +3,8 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 const mongoURI = process.env.MONGODB;
 const connectionOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+  // useNewUrlParser: true,
+  // useUnifiedTopology: true,
   serverSelectionTimeoutMS: 10000,
   socketTimeoutMS: 15000,
   // connectTimeoutMS: 20000,
